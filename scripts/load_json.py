@@ -3,7 +3,7 @@ import pickle
 
 glue_client = boto3.client("glue", "eu-west-1")
 
-with open("temp_output/delius_borough_table_json.pkl", "rb") as f:
+with open("delius_borough_table_json_121124.pkl", "rb") as f:
     json_data = pickle.load(f)
 
 table = json_data['Table']
@@ -11,16 +11,16 @@ table = json_data['Table']
 source_bucket = "mojap-derived-tables"
 dest_bucket = "mojap-compute-development-derived-tables-replication"
 
-table['StorageDescriptor']['Location'] = (
-    table['StorageDescriptor']['Location']
-    .replace(source_bucket, dest_bucket)
-)
+# table['StorageDescriptor']['Location'] = (
+#     table['StorageDescriptor']['Location']
+#     .replace(source_bucket, dest_bucket)
+# )
 
-if 'metadata_location' in table['Parameters']:
-    table['Parameters']['metadata_location'] = (
-        table['Parameters']['metadata_location']
-        .replace(source_bucket, dest_bucket)
-    )
+# if 'metadata_location' in table['Parameters']:
+#     table['Parameters']['metadata_location'] = (
+#         table['Parameters']['metadata_location']
+#         .replace(source_bucket, dest_bucket)
+#     )
 
 print(table)
 

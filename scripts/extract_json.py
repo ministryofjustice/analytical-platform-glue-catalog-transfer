@@ -1,11 +1,14 @@
-import boto3
 import pickle
 import re
+
+import boto3
+
+print("setting up clients...")
 
 s3_client = boto3.client('s3')
 glue_client = boto3.client('glue')
 
-def list_s3_objects(bucket_name, prefix=None):
+def list_s3_objects(bucket_name: str, prefix: str = ""):
     """List objects in an S3 bucket with an optional prefix."""
     objects = []
     paginator = s3_client.get_paginator('list_objects_v2')
@@ -18,42 +21,56 @@ def list_s3_objects(bucket_name, prefix=None):
 
     return objects
 
-# Example usage
-bucket_name = 'mojap-derived-tables'
-prefix = 'prod/models/domain_name=probation/database_name=delius/table_name=borough_wap/'  #prod/models/domain_name=bold/'
-# 'prod/models/domain_name=courts/database_name=xhibit_derived/
 
-objects = list_s3_objects(bucket_name, prefix)
+if __name__ == "__main__":
+    # Example usage
+    print("starting...")
+    
+    BUCKET_NAME = 'mojap-derived-tables'
+
+    DOMAIN_NAME = 'courts'
+    database_name = "xhibit_derived_beta"
+    prefix = f'prod/models/domain_name={DOMAIN_NAME}/database_name={database_name}/'
 
 
-pattern = r"(database_name=[^/]+/table_name=[^/]+)"
-results = set()
+    database_objects = list_s3_objects(BUCKET_NAME, prefix)
 
-# Print the objects
-for obj in objects:
-    match = re.search(pattern, obj)
-    if match:
-        result = match.group(0)
-        results.add(result)
+    pattern = r"(database_name=[^/]+/table_name=[^/]+)"
+    table_paths = set()
 
-# Pass db and table name into glue_client.get_table
-for i in list(results)[:1]:
-    db_name = i.split("/")[0].replace("database_name=", "")
-    table_name = i.split("/")[1].replace("table_name=", "")
+    # Print the objects
+    for obj in database_objects:
+        match = re.search(pattern, obj)
+        if match:
+            table_path = match.group(0)
+            table_paths.add(table_path)
 
-    if "_wap" in table_name:
-        table_name = table_name[:-4]
-    # print("db:", db_name, "\ntbl:", table_name, "\n")
+    # Pass db and table name into glue_client.get_table
+    for table_path in table_paths:
+        db_name = table_path.split("/")[0].replace("database_name=", "")
+        table_name = table_path.split("/")[1].replace("table_name=", "")
 
-    response = glue_client.get_table(
-        DatabaseName=db_name,
-        Name=table_name
-    )
+        # WAP = Write Aappend Publish. _wap tables are named with '_wap' suffix removed
+        if "_wap" in table_name:
+            table_name = table_name[:-4]
 
-    location = response['Table']['StorageDescriptor']['Location']
-    print("db:", db_name, "\ntbl:", table_name, "\ns3_location:", location, "\n")
+        print("db:", db_name, "\ntbl:", table_name)
+        try:
+            response = glue_client.get_table(
+                DatabaseName=db_name,
+                Name=table_name
+            )
 
-    with open("temp_ouput/delius_borough_table_json.pkl", "wb") as file:
-        pickle.dump(response, file)
+            location = response['Table']['StorageDescriptor']['Location']
+            print("s3_location:", location)
 
-# Output JSON to local file
+            pickle_filename = f"{db_name}_{table_name}.pkl"
+            with open(pickle_filename, "wb") as file:
+                pickle.dump(response, file)
+
+            print(f"Pickle file {pickle_filename} saved")
+        
+        except Exception as e:
+            print(e)
+
+    # Output JSON to local Pickle file
