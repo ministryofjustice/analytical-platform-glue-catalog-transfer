@@ -1,12 +1,12 @@
 .env
 .terraform/
 coverage/
-venv/
+*venv/
 env/
 .DS_STORE
 .vscode
 *.code-workspace
 *.sha256
 terraform.tfstate
-temp_output/
+*_output/
 *.pkl

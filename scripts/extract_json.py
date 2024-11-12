@@ -1,23 +1,25 @@
 import pickle
 import re
+from pathlib import Path
 
 import boto3
 
 print("setting up clients...")
 
-s3_client = boto3.client('s3')
-glue_client = boto3.client('glue')
+s3_client = boto3.client("s3")
+glue_client = boto3.client("glue")
+
 
 def list_s3_objects(bucket_name: str, prefix: str = ""):
     """List objects in an S3 bucket with an optional prefix."""
     objects = []
-    paginator = s3_client.get_paginator('list_objects_v2')
+    paginator = s3_client.get_paginator("list_objects_v2")
 
     # Paginate through all objects
     for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-        if 'Contents' in page:
-            for obj in page['Contents']:
-                objects.append(obj['Key'])  # Append each object's key (file path)
+        if "Contents" in page:
+            for obj in page["Contents"]:
+                objects.append(obj["Key"])  # Append each object's key (file path)
 
     return objects
 
@@ -25,13 +27,12 @@ def list_s3_objects(bucket_name: str, prefix: str = ""):
 if __name__ == "__main__":
     # Example usage
     print("starting...")
-    
-    BUCKET_NAME = 'mojap-derived-tables'
 
-    DOMAIN_NAME = 'courts'
-    database_name = "xhibit_derived_beta"
-    prefix = f'prod/models/domain_name={DOMAIN_NAME}/database_name={database_name}/'
+    BUCKET_NAME = "mojap-derived-tables"
 
+    DOMAIN_NAME = "courts"
+    database_name = "derived_xhibit_beta"
+    prefix = f"prod/models/domain_name={DOMAIN_NAME}/database_name={database_name}/"
 
     database_objects = list_s3_objects(BUCKET_NAME, prefix)
 
@@ -45,10 +46,15 @@ if __name__ == "__main__":
             table_path = match.group(0)
             table_paths.add(table_path)
 
+    print(f"number of tables: {len(table_paths)}")
+
     # Pass db and table name into glue_client.get_table
     for table_path in table_paths:
+
         db_name = table_path.split("/")[0].replace("database_name=", "")
         table_name = table_path.split("/")[1].replace("table_name=", "")
+
+        print(f"table name: {table_name}")
 
         # WAP = Write Aappend Publish. _wap tables are named with '_wap' suffix removed
         if "_wap" in table_name:
@@ -56,20 +62,20 @@ if __name__ == "__main__":
 
         print("db:", db_name, "\ntbl:", table_name)
         try:
-            response = glue_client.get_table(
-                DatabaseName=db_name,
-                Name=table_name
-            )
+            response = glue_client.get_table(DatabaseName=db_name, Name=table_name)
 
-            location = response['Table']['StorageDescriptor']['Location']
+            location = response["Table"]["StorageDescriptor"]["Location"]
             print("s3_location:", location)
 
-            pickle_filename = f"{db_name}_{table_name}.pkl"
+            database_dir = f"json_output/{db_name}"
+            pickle_filename = f"json_output/{db_name}/{table_name}.pkl"
+            Path(database_dir).mkdir(parents=True, exist_ok=True)
+
             with open(pickle_filename, "wb") as file:
                 pickle.dump(response, file)
 
             print(f"Pickle file {pickle_filename} saved")
-        
+
         except Exception as e:
             print(e)
 
