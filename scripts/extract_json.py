@@ -1,10 +1,14 @@
+import os
 import pickle
 import re
 from pathlib import Path
 
 import boto3
+from dotenv import find_dotenv, load_dotenv
 
 print("setting up clients...")
+
+load_dotenv(find_dotenv())
 
 s3_client = boto3.client("s3")
 glue_client = boto3.client("glue")
@@ -24,6 +28,19 @@ def list_s3_objects(bucket_name: str, prefix: str = ""):
     return objects
 
 
+def check_aws_account(expected_account_name: str):
+    session = boto3.Session()
+    sts_client = session.client("sts")
+    account_id = sts_client.get_caller_identity()["Account"]
+    expected_account_id = os.environ.get(expected_account_name)
+
+    if account_id != expected_account_id:
+        raise ValueError(f"Not running in expected account: {expected_account_name}")
+
+
+check_aws_account("analytical-platform-data-production")
+
+
 if __name__ == "__main__":
     # Example usage
     print("starting...")
@@ -31,7 +48,7 @@ if __name__ == "__main__":
     BUCKET_NAME = "mojap-derived-tables"
 
     DOMAIN_NAME = "courts"
-    database_name = "derived_xhibit_beta"
+    database_name = "xhibit"
     prefix = f"prod/models/domain_name={DOMAIN_NAME}/database_name={database_name}/"
 
     database_objects = list_s3_objects(BUCKET_NAME, prefix)
@@ -57,8 +74,13 @@ if __name__ == "__main__":
         print(f"table name: {table_name}")
 
         # WAP = Write Aappend Publish. _wap tables are named with '_wap' suffix removed
-        if "_wap" in table_name:
-            table_name = table_name[:-4]
+        suffixes = ["_wap", "_scd2"]
+        # remove suffix from table name if present
+        for suffix in suffixes:
+            if suffix in table_name:
+                table_name = table_name[: -len(suffix)]
+                print(f"suffix: {suffix} removed")
+                break
 
         print("db:", db_name, "\ntbl:", table_name)
         try:
