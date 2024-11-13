@@ -23,7 +23,7 @@ def repair_table(
 
 load_dotenv(find_dotenv())
 
-glue_client = boto3.client("glue", region_name="eu-west-1")
+glue_client = boto3.client("glue", region_name="eu-west-2")
 
 
 # Check that the script is running in the correct AWS account
@@ -98,11 +98,13 @@ for path in pathlist:
     except Exception as e:
         print("table creation failed:", e)
         break
+    
 
     if is_hive:
-        query_results_bucket = "aws-athena-query-results-eu-west-1-apc-dev"
+        query_results_bucket = ("aws-athena-query-results-eu-west-2-"
+            f'{os.environ.get("analytical-platform-compute-development")}')
         #     # Add MSCK REPAIR TABLE statement after table creation
-        athena_client = boto3.client("athena")
+        athena_client = boto3.client("athena", region_name="eu-west-2")
         try:
             repair_table(database_name, table_name, query_results_bucket)
             print(f"table {table_name} repaired")
